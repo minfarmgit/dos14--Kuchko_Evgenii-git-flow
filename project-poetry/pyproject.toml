@@ -7,8 +7,10 @@ authors = ["GosuOoops <evgenii_neo@mail.ru>"]
 [tool.poetry.dependencies]
 python = "^3.10"
 
-[tool.poetry.dev-dependencies]
-pytest = "^5.2"
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
 black = "^23.3.0"
 
 [build-system]
