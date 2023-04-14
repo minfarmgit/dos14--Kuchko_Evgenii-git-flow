@@ -4,4 +4,5 @@ shell = os.getenv("SHELL")
 if shell == "/bin/bash":
     print("Greetings bash")
 else:
-    print("HELLO {shell}")
+    print(f'HELLO {shell}')
+ 
