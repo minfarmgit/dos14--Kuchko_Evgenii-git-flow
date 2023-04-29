@@ -40,7 +40,6 @@ users.extend(users1)
 def calculate_age(birth_date):
     today = datetime.date.today()
     age = today.year - int(birth_date)
-    print(age)
     return age
 
 
@@ -55,21 +54,12 @@ with open('users.json', 'w', encoding='utf-8') as f:
 
 
 # Функция add_user использует модуль json для чтения и записи данных в файл
-def add_user(first_name, last_name, fathers_name, date_of_birth, user_list=None):
-    new_user = {
-        'rst_name': first_name,
-        'last_name': last_name,
-        'fathers_name': fathers_name,
-        'date_of_birth': date_of_birth,
-    }
-    user_list.append(new_user)
-    return user_list
-
+def add_user(first_name, last_name, fathers_name, date_of_birth):
     # Сначала мы открываем файл users.json на чтение и считываем из него данные в переменную data
-    with open("users.json", "r") as file:
+    with codecs.open('users.json', 'r', 'utf_8_sig') as file:
         data = json.load(file)
         # Находим максимальный id в списке пользователей data и вычисляем новый id, увеличивая его на один
-        max_id = max([user["id"] for user in data])
+        max_id = max([int(user["id"]) for user in data])
     # Cоздаем словарь new_user, заполняя его данными о новом пользователе
     new_user = {
         "id": max_id + 1,
@@ -77,9 +67,16 @@ def add_user(first_name, last_name, fathers_name, date_of_birth, user_list=None)
         "last_name": last_name,
         "fathers_name": fathers_name,
         "date_of_birth": date_of_birth,
-        "age": age,
+        "age": calculate_age(date_of_birth),
     }
     data.append(new_user)
 
     with open("users.json", "w", encoding='utf-8') as file:
         json.dump(data, file, ensure_ascii=False)
+
+add_user(
+    'Евгений',
+    'Кучко',
+    'Николаевич',
+    '1990',
+)
