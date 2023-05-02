@@ -1,82 +1,141 @@
-import yaml
-import csv
 import json
+import yaml
+from datetime import datetime
 import codecs
-import datetime
 
-users = []
-# чтение данных из файлов
-with codecs.open('users.yaml', 'r', 'utf_8_sig') as f:
-    yaml_data = yaml.safe_load(f)
-with codecs.open('users.csv', 'r', 'utf_8_sig') as f:
-    csv_data = csv.DictReader(f)
-    for data in csv_data:
-        user = {
-        'id': data['id'],
-        'first_name': data['first_name'],
-        'last_name': data['last_name'],
-        'fathers_name': data['fathers_name'],
-        'date_of_birth': data['date_of_birth'],
-        }
-        users.append(user)
+class Permissions:
+    def __init__(self, create=False, read=False, update=False, delete=False):
+        self._create = create
+        self._read = read
+        self._update = update
+        self._delete = delete
 
-# создание списка словарей
-users1 = []
-for data in yaml_data['users']:
-    user = {
-        'id': data['id'],
-        'first_name': data['first_name'],
-        'last_name': data['last_name'],
-        'fathers_name': data['fathers_name'],
-        'date_of_birth': data['date_of_birth'],
-        }
-    users1.append(user)
+    @property
+    def create(self):
+        return self._create
 
-# Объединяем 2 бъединяем два списка users и users1
-users.extend(users1)
+    @property
+    def read(self):
+        return self._read
+
+    @property
+    def update(self):
+        return self._update
+
+    @property
+    def delete(self):
+        return self._delete
 
 
-# функция для расчёта возраста
-def calculate_age(birth_date):
-    today = datetime.date.today()
-    age = today.year - int(birth_date)
-    return age
+class Role:
+    def __init__(self, name, permissions_dict):
+        self._name = name
+        self._role = {}
+        for key, value in permissions_dict.items():
+            self._role[key] = Permissions(**value)
+
+    @property
+    def name(self):
+        return self._name
+
+    def __getitem__(self, key):
+        return self._role[key]
 
 
-# добавление атрибута age к каждому пользователю
-for user in users:
-    age = calculate_age(user['date_of_birth'])
-    user['age'] = age
+class Entity:
+    def __init__(self, entity_id, role):
+        self._entity_id = entity_id
+        self._role = role
 
-# запись данных в файл
-with open('users.json', 'w', encoding='utf-8') as f:
-    json.dump(users, f, ensure_ascii=False)
+    @property
+    def entity_id(self):
+        return self._entity_id
+
+    @property
+    def role(self):
+        return self._role
 
 
-# Функция add_user использует модуль json для чтения и записи данных в файл
-def add_user(first_name, last_name, fathers_name, date_of_birth):
-    # Сначала мы открываем файл users.json на чтение и считываем из него данные в переменную data
-    with codecs.open('users.json', 'r', 'utf_8_sig') as file:
-        data = json.load(file)
-        # Находим максимальный id в списке пользователей data и вычисляем новый id, увеличивая его на один
-        max_id = max([int(user["id"]) for user in data])
-    # Cоздаем словарь new_user, заполняя его данными о новом пользователе
-    new_user = {
-        "id": max_id + 1,
-        "first_name": first_name,
-        "last_name": last_name,
-        "fathers_name": fathers_name,
-        "date_of_birth": date_of_birth,
-        "age": calculate_age(date_of_birth),
-    }
-    data.append(new_user)
+class User(Entity):
+    def __init__(self, entity_id, role, first_name, last_name, fathers_name, date_of_birth):
+        super().__init__(entity_id, role)
+        self._first_name = first_name
+        self._last_name = last_name
+        self._fathers_name = fathers_name
+        self._date_of_birth = date_of_birth
 
-    with open("users.json", "w", encoding='utf-8') as file:
-        json.dump(data, file, ensure_ascii=False)
+    @property
+    def first_name(self):
+        return self._first_name
 
-add_user(
-    'Евгений',
-    'Кучко',
-    'Николаевич',
-    '1990',
-)
+    @property
+    def last_name(self):
+        return self._last_name
+
+    @property
+    def fathers_name(self):
+        return self._fathers_name
+
+    @property
+    def date_of_birth(self):
+        return self._date_of_birth
+
+    @property
+    def age(self):
+        today = date.today()
+        return today.year - self._date_of_birth.year
+
+
+class Organisation(Entity):
+    def __init__(self, entity_id, role, creation_date, unp, name):
+        super().__init__(entity_id, role)
+        self._creation_date = creation_date
+        self._unp = unp
+        self._name = name
+
+    @property
+    def creation_date(self):
+        return self._creation_date
+
+    @property
+    def unp(self):
+        return self._unp
+
+    @property
+    def name(self):
+        return self._name
+
+
+class App(Entity):
+    def __init__(self, entity_id, role, name):
+        super().__init__(entity_id, role)
+        self._name = name
+
+    @property
+    def name(self):
+        return self._name
+
+def create_user(entity_id, role, first_name, last_name, fathers_name, date_of_birth):
+    return {'entity_id': entity_id, 'role': role, 'first_name': first_name, 'last_name': last_name, 'fathers_name': fathers_name, 'date_of_birth': date_of_birth}
+
+# Чтение данных из файлов users.json, apps.yaml, roles.yaml и создание объектов
+
+with codecs.open('users.json', 'r', 'utf_8_sig') as f:
+    users_data = json.load(f)['Users']
+    users = []
+    for user in users_data:
+        users.append(User(user['entity_id'], user['role'], user['first_name'], user['last_name'], user['fathers_name'], int(user['date_of_birth'])))
+
+with codecs.open('app.yaml', 'r', 'utf_8_sig') as f:
+    apps_data = yaml.load(f, Loader=yaml.FullLoader)['Apps']
+    apps = []
+    for app in apps_data:
+        apps.append(App(app['entity_id'], app['role'], app['name']))
+
+with codecs.open('roles.yaml', 'r', 'utf_8_sig') as f:
+    roles_data = yaml.load(f, Loader=yaml.FullLoader)
+    roles = {}
+    for roleK, roleV in roles_data.items():
+        newRole = {}
+        roles[roleK] = Role(roleK, roleV)
+    print(roles['bank']['CreditAccount'].read)
