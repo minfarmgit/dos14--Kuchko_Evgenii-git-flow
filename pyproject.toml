@@ -14,6 +14,7 @@ optional = true
 pytest = "^7.3.0"
 black = "^23.3.0"
 pyyaml = "^6.0"
+flask = "*"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
