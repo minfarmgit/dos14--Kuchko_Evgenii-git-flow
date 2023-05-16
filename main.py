@@ -272,7 +272,7 @@ def get_organisation(client_id):
         print(f"Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 400
 
-   @app.route('/api/v1/users', methods=['GET'])
+@app.route('/api/v1/users', methods=['GET'])
 def get_users():
 
     try:
