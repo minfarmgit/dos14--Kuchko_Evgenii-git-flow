@@ -219,69 +219,63 @@ app = Flask(__name__)
 @app.route('/api/v1/users/<int:client_id>', methods=['GET'])
 def get_user(client_id):
     try:
-        # Check if the user has permission to read users
-        token = request.headers.get('users')
-        if not token:
-            return jsonify({"status": "error", "message": "Token header not found"}), 400
+        if 'token' not in request.headers:
+            raise ValueError("Token header not found")
+        token = request.headers['token']
         token_data = json.loads(token)
-        if token_data.get('client_id') != client_id:
-            return jsonify({"status": "error", "message": "User does not have permission to read users"}), 403
+        token_client_id = token_data['client_id']
 
-        # Find the user with the specified client_id
-        user = next((u for u in users if u['client_id'] == client_id), None)
+        if token_client_id != client_id:
+            raise ValueError("Client ID in token header does not match requested client ID")
+
+        # Find the user with the requested client ID
+        user = User.query.filter_by(client_id=client_id).first()
+        
         if not user:
-            return jsonify({"status": "error", "message": f"No user with id = {client_id}"}), 404
-
-        # Check if the user's role has access to read users
-        if user['role'] != 'role':
-            return jsonify({"status": "error", "message": "User does not have permission to read users"}), 403
-
+            raise ValueError(f"No user with ID {client_id}")
+        
+        if not user.role['Users'].read:
+            raise ValueError(f"User with ID {client_id} does not have read")
+        
         # Return the user data
-        return jsonify(user)
-    except Exception as e:
+        return jsonify(user.to_dict())
+    except ValueError as e:
         # Log the error
         print(f"Error: {e}")
-        return jsonify({"status": "error", "message": "An error occurred"}), 500
+        return jsonify({"status": "error", "message": str(e)}), 400
 
 @app.route('/api/v1/organisations/<client_id>', methods=['GET'])
 def get_organisation(client_id):
 
     try:
-            # Check if the user has permission to access organizations
-        if not has_permission(request.headers.get('Organisations')):
-             return jsonify(
-                {'status': 'error', 'message': 'User does not have permission to access organizations'}), 403
+        # Получение client_id из заголовка запроса
+        client_id = request.headers.get('client_id')
+        if not client_id:
+            raise ValueError("client_id not found in request header")
+        
+        # Проверка, имеет ли пользователь разрешение на чтение организаций
+        user = get_current_user()  # Implement this function to get the current user
+        if not user.organisation.role['Organisations'].read:
+            raise ValueError("User does not have permission to read organisations")
+        
+        # Поиск организации с данным client_id
+        organisation = Organisation.query.filter_by(client_id=client_id).first()
+        if not organisation:
+            raise ValueError(f"No organisation found with client_id = {client_id}")
+        
+        # Проверка, есть ли у пользователя разрешение на доступ к организации
+        if not user.organisation.role['Organisations'].access:
+            raise ValueError("User does not have permission to access this organisation")
+        
+        # Return the organisation data
+        return jsonify(organisation.to_dict())
+    
+    except ValueError as e:
+        # Log the error
+        print(f"Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 400
 
-            # Check if the token header is present
-        token_header = request.headers.get('Organisations')
-        if not token_header:
-            return jsonify({'status': 'error', 'message': 'Token header not found'}), 400
-
-
-            # Check if the client_id in the token matches the client_id in the URL
-        if token_data.get('client_id') != client_id:
-            return jsonify({'status': 'error', 'message': 'Token client_id does not match URL client_id'}), 400
-
-            # Find the organization with the given client_id
-        organization = find_organization(client_id)
-        if not organization:
-            return jsonify({'status': 'error', 'message': f'No organization with id = {client_id}'}), 404
-
-            # Check if the user has permission to access the organization
-        if not has_organization_permission(request.headers.get('Organisations'), organization):
-            return jsonify(
-                {'status': 'error', 'message': 'User does not have permission to access this organization'}), 403
-
-            # Return the organization data
-        return jsonify(organization)
-
-    except Exception as e:
-            # Log the error
-        app.logger.error(str(e))
-        return jsonify({'status': 'error', 'message': 'An error occurred while processing the request'}), 500
-
-
-@app.route('/api/v1/users', methods=['GET'])
+   @app.route('/api/v1/users', methods=['GET'])
 def get_users():
 
     try:
