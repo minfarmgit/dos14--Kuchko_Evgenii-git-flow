@@ -225,9 +225,6 @@ def get_user(client_id):
         token_data = json.loads(token)
         token_client_id = token_data['client_id']
 
-        if token_client_id != client_id:
-            raise ValueError("Client ID in token header does not match requested client ID")
-
         # Find the user with the requested client ID
         user = User.query.filter_by(client_id=client_id).first()
         
