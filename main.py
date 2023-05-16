@@ -431,3 +431,6 @@ def check_authorization(action):
         # Log the error
         app.logger.error(str(e))
         return jsonify({"status": "error", "message": str(e)}), 400
+    
+if __name__ == '__main__':
+    app.run()    
