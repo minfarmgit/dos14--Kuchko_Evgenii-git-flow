@@ -35,3 +35,109 @@
 ["2_Олеговна", "1_Анатольевич", "3_Эдуардович", "5_Валерьевна", "7_Игоревна", "6_Васильевна", "9_Иосифович",
 "8_Александровна", "10_Игоревна", "4_Владимирович"]
 ['1_1985', '3_1978', '4_2001', '10_1982', '5_1970', '6_1990', '8_1963', '7_2004', '2_1996', '9_1966']
+
+### HOMEWORK17
+1. Прочитать информацию о пользователях из файлов yaml,csv 
+2. Из полученных данных создать список из словарей с атрибутами пользователей *{"id": <id>, "first_name": <first_name>, "last_name": <last_name>, "fathers_name":   <fathers_name>, "date_of_birth": <data_of_birth>}*
+3. Создать функцию для расчёта возраста пользователя 
+4. Прогоняем на список через функцию расчёта возраста и добавляем новый атрибут age каждому словарю 
+5. Записываем полученные данные в **users.json файл** 
+6. Создать функцию для добавления пользователей
+7. Функия должна принимать все атрибуты пользователя кроме id *(first_name, last_name, fathers_name, date_of_birth)* 
+8. **id** вычисляется в функции, как наибольшее id пользователя (из списка) +1 
+9. age вычисляется на основании функции **расчёта возраста пользователя** 
+10. на основании полученных и вычесленных аттрибутов добавляем новый элемент в наш список словарей
+11. записываем полученные данные в users.json файл
+  
+ ### Homework 18
+ 1. Создать класс **Permissions**
+    - cоздать boolean свойства на чтение запись - *create,read,update,delete*
+ 2. Cоздать класс **Role**
+    - создать свойство только на чтение строку name
+    - cоздать свойство role которое является словарём, где ключ имена наших классов выполняющие бизнес логику **(Credit,Deposit,DebitAccount,CreditAccount,User,Organisation,Identity)**, а значение объекты *Permissions*
+    - Либо класс Role должен принимать как ключ имена выше указанных классов и выдовать в качестве значений объекты **Permissions**
+     >> a = Role("default",**dict_with_permissions)
+     >> a.name
+     default
+     >> a["Credit].create
+     False
+     >> a["DebitAccount"].update
+     False
+3. Создать класс **Entity**
+    - Создать свойство только на чтение - **entity_id** (оно должно быть int)
+    - Cоздать свойcтво на чтение/запись - **role** с типом **Role**
+4. Создать класс **User**
+    - Унаследоваться от **Entity**
+    - Добавить свойства только на чтение *first_name, last_name, fathers_name, date_of_birth*
+    - Добавить свойство только на чтение *age*, которое высчитывается из *date_of_birth*
+5. Создать класс **Organisation**
+    - Унаследоваться от **Entity**
+    - Добавить свойства *creation_date, unp, name*
+6. Создать класс **App**
+    - Унаследоваться от **Entity**
+    - Добавить свойства *name*
+7. Прочитать данные из файлов *users.json, apps.yaml, roles.yaml* и создать на основании их объекты
+8. В функции *сreate_user* из предыдущего задания создаём не словарь а объект
+  
+  ### Homework 19
+
+1. Переименовываем *entity_id* в *client_id* во всех классах 
+2. Переименовываем class *Entity* в *Client*
+3. Прочитать данные из файлов users.json, apps.yaml, roles.yaml и создать на основании их объекты 
+4. Устанавливаем Flask через poetry
+5. Наш сервис должен иметь следующий http интерфейс
+  - GET /api/v1/users/<client_id> - получить данные о пользователе
+    - Перед тем как получить данные посмотреть есть ли у пользователя права на чтение users
+      - Найти заголовок token
+        - Если его нет ошибка 400 {"status": "error", "message": f"Token header not found"}
+      - В заголовке должен быть json {"client_id": <client_id>}
+      - По id найти объект и проверить есть ли у роли такой доступ
+    - Если не нашли пользователя с таким client_id то возвращаем {"status": "error", "message": f"No user with id = {client_id}"}
+  - GET /api/v1/organisations/<client_id> - получить данные об организации 
+    - Перед тем как получить данные посмотреть есть ли у пользователя права на чтение organisations
+      - Найти заголовок token
+        - Если его нет ошибка 400 {"status": "error", "message": f"Token header not found"}
+      - В заголовке должен быть json {"client_id": <client_id>}
+      - По id найти объект и проверить есть ли у роли такой доступ
+    - Если не нашли организацию с таким client_id то возвращаем {"status": "error", "message": f"No organisation with id = {client_id}"}
+  - GET /api/v1/users - получить данные о всех пользователях
+    - Перед тем как получить данные посмотреть есть ли у пользователя права на чтение users
+      - Найти заголовок token
+        - Если его нет ошибка 400 {"status": "error", "message": f"Token header not found"}
+      - В заголовке должен быть json {"client_id": <client_id>}
+      - По id найти объект и проверить есть ли у роли такой доступ
+  - GET /api/v1/organisations - получить данные о всех организациях
+    - Перед тем как получить данные посмотреть есть ли у пользователя права на чтение organisations
+      - Найти заголовок token
+        - Если его нет ошибка 400 {"status": "error", "message": f"Token header not found"}
+      - В заголовке должен быть json {"client_id": <client_id>}
+      - По id найти объект и проверить есть ли у роли такой доступ
+  - PUT /api/v1/users - создать пользователя используя {"first_name": "...", "role": "...", "last_name": "...", "fathers_name": "...", "date_of_birth": "..."}
+    - Перед тем как получить данные посмотреть есть ли у пользователя права на запись users
+      - Найти заголовок token
+        - Если его нет ошибка 400 {"status": "error", "message": f"Token header not found"}
+      -  заголовке должен быть json {"client_id": <client_id>}
+      - По id найти объект и проверить есть ли у роли такой доступ
+    - Пишем в файл users.json
+  - PUT /api/v1/organisations - создать организацию используя {"role": "", "creation_date": "", "unp": "", "name": ""}
+    - Перед тем как получить данные посмотреть есть ли у пользователя права на запись organisations
+      - Найти заголовок token
+        - Если его нет ошибка 400 {"status": "error", "message": f"Token header not found"}
+      - В заголовке должен быть json {"client_id": <client_id>}
+      - По id найти объект и проверить есть ли у роли такой доступ
+    - Пишем в файл users.json
+  - GET /api/v1/credits/authz/{create,read,update,delete}
+  - GET /api/v1/deposits/authz/{create,read,update,delete}
+  - GET /api/v1/debitaccounts/authz/{create,read,update,delete}
+  - GET /api/v1/creditaccounts/authz/{create,read,update,delete}
+  - GET /api/v1/users/authz/{create,read,update,delete}
+  - GET /api/v1/organisations/authz/{create,read,update,delete}
+  - GET /api/v1/identities/authz/{create,read,update,delete}
+    - Для каждого из этих URI
+      - Найти заголовок token
+        - Если его нет ошибка 400 {"status": "error", "message": f"Token header not found"}
+      - В заголовке должен быть json {"client_id": <client_id>}
+      - По id найти объект и проверить есть ли у роли такой доступ
+      - Если есть 200 и {"status": "success", "message": "authorized"}
+        - Если нет или, что то пошло не так то  403 {"status": "error", "message": "not authorized"}  
+  
