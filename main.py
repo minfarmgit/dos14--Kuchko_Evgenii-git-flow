@@ -1,12 +1,24 @@
 import json
 import yaml
 from datetime import datetime, date
-import codecs
 from flask import Flask, request, jsonify
+
+app = Flask(__name__)
 
 roles = {}
 users = []
 organisations = []
+apps = []
+
+class AuthorizationError(BaseException):
+    pass
+
+class PermissionError(AuthorizationError):
+    pass
+
+class ClientNotFoundError(AuthorizationError):
+    pass
+
 class Permissions:
     def __init__(self, create=False, read=False, update=False, delete=False):
         self._create = create
@@ -33,15 +45,21 @@ class Permissions:
             'update': self._update,
             'delete': self._delete,
         }
+
 class Role:
     def __init__(self, name, permissions_dict):
         self._name = name
         self._role = {}
         for key, value in permissions_dict.items():
             self._role[key] = Permissions(**value)
+
     @property
     def name(self):
         return self._name
+
+    def __contains__(self, key):
+        return key in self._role
+
     def __getitem__(self, key):
         return self._role[key]
     @property
@@ -53,24 +71,28 @@ class Role:
             'name': self._name,
             'permissions': permissions
         }
+
 class Client:
     def __init__(self, client_id, role):
         self._client_id = client_id
         self._role = role
+
     @property
     def client_id(self):
         return self._client_id
     @property
     def role(self):
         return self._role
+
+
 class User(Client):
-    query = None
     def __init__(self, client_id, role, first_name, last_name, fathers_name, date_of_birth):
         super().__init__(client_id, role)
         self._first_name = first_name
         self._last_name = last_name
         self._fathers_name = fathers_name
         self._date_of_birth = date_of_birth
+
     @property
     def first_name(self):
         return self._first_name
@@ -97,6 +119,7 @@ class User(Client):
             'fathers_name': self._fathers_name,
             'date_of_birth': self._date_of_birth,
         }
+
 class Organisation(Client):
     def __init__(self, client_id, role, creation_date, unp, name):
         super().__init__(client_id, role)
@@ -121,238 +144,210 @@ class Organisation(Client):
             'unp': self._unp,
             'name': self._name,
         }
+
 class App(Client):
     def __init__(self, client_id, role, name):
         super().__init__(client_id, role)
         self._name = name
+
     @property
     def name(self):
         return self._name
+
 # Функция add_users использует модуль json для записи данных в файл
-def save_permissions_data(users_data_input, organisations_data_input):
+def write_data(users, organisations):
     data_to_save = {
         'users': [],
         'organisations': [],
     }
-    for user_item in users_data_input:
-        data_to_save['users'].append(user_item.get_obj)
-    for organisation_item in organisations_data_input:
-        data_to_save['organisations'].append(organisation_item.get_obj)
-    with open("users-data.json", "w", encoding='utf-8') as file:
+    for user in users:
+        data_to_save['users'].append(user.get_obj)
+    for organisation in organisations:
+        data_to_save['organisations'].append(organisation.get_obj)
+    with open("users-data.json", "w") as file:
         json.dump(data_to_save, file, ensure_ascii=False)
-def user_add(data):
-    max_id = max([int(user_item._client_id) for user_item in users])
-    users.append(User(
-        max_id + 1,
-        roles[data['role_name']],
-        data['first_name'],
-        data['last_name'],
-        data['fathers_name'],
-        data['date_of_birth'],
-    ))
-with codecs.open('roles.yaml', 'r', 'utf_8_sig') as f:
-    roles_data = yaml.load(f, Loader=yaml.FullLoader)
+
+def get_client_by_id(client_id, clients):
+    for client in clients:
+        if client.client_id == client_id:
+            return client
+    raise ClientNotFoundError(f"No Client found with client_id = {client_id}")
+
+def get_client_id_from_header(header_name, headers):
+    if header_name not in headers:
+        raise ValueError(f"{header_name} header not found")
+
+    header = headers.get(header_name)
+    header = json.loads(header)
+    
+    if 'client_id' not in header:
+        raise ValueError(f"{header_name} header doesnt have client_id attribute")
+
+    return  header['client_id']
+
+def next_client_id(clients):
+    sorted_clients = sorted(clients, key=lambda x: x.client_id, reverse=True)
+    return sorted_clients[0].client_id + 1
+
+def check_permission(client, subject, permission):
+    if subject not in client.role:
+        raise PermissionError(f"Client with id {client.client_id} does not have {subject} subject in role {client.role.name}")
+    if not hasattr(client.role[subject], permission):
+        raise PermissionError(f"Client role {client.role.name} does not have such permission - {permission}")
+    if not getattr(client.role[subject], permission):
+        raise PermissionError(f"Client with id {client.client_id} does not have {subject}.{permission} permission")
+
+    return True
+
+with open('roles.yaml', 'r') as f:
+    roles_data = yaml.safe_load(f)
     for roleK, roleV in roles_data.items():
-        newRole = {}
         roles[roleK] = Role(roleK, roleV)
-    print(roles['bank']['creditaccounts'].read)
-with codecs.open('users.json', 'r', 'utf_8_sig') as f:
+
+with open('users.json', 'r') as f:
     json_data = json.load(f)
     users_data = json_data['Users']
     for user in users_data:
-        users.append(
-            User(user['client_id'], roles[user['role']], user['first_name'], user['last_name'], user['fathers_name'],
-                 int(user['date_of_birth'])))
+        user['date_of_birth'] = int(user['date_of_birth'])
+        user['role'] = roles[user['role']]
+        users.append(User(**user))
+
     organisations_data = json_data['Organisations']
     for organisation in organisations_data:
-        organisations.append(
-            Organisation(organisation['client_id'], roles[organisation['role']], organisation['creation_date'],
-                         organisation['unp'], organisation['name']))
-with codecs.open('app.yaml', 'r', 'utf_8_sig') as f:
-    apps_data = yaml.load(f, Loader=yaml.FullLoader)['Apps']
-    apps = []
-    for app in apps_data:
-        apps.append(App(app['client_id'], app['role'], app['name']))
-app = Flask(__name__)
-@app.route('/api/v1/users/<int:client_id>', methods=['GET'])
-def get_user(client_id):
+        organisation['role'] = roles[organisation['role']]
+        organisations.append(Organisation(**organisation))
+
+with open('app.yaml', 'r') as f:
+    apps_data = yaml.safe_load(f)['Apps']
+    for a in apps_data:
+        a['role'] = roles[a['role']]
+        apps.append(App(**a))
+
+clients=(apps + users + organisations)
+
+@app.route('/api/v1/users/<int:user_id>', methods=['GET'])
+def get_user(user_id):
     try:
-        if 'token' not in request.headers:
-            raise ValueError("Token header not found")
-        token = request.headers['token']
-        token_data = json.loads(token)
-        token_client_id = token_data['client_id']
-        if token_client_id != client_id:
-            raise ValueError("Client ID in token header does not match requested client ID")
-        # Find the user with the requested client ID
-        user = User.query.filter_by(client_id=client_id).first()
-        if not user:
-            raise ValueError(f"No user with ID {client_id}")
-        if not user.role['Users'].read:
-            raise ValueError(f"User with ID {client_id} does not have read")
-        # Return the user data
-        return jsonify(users.to_dict())
+        client_id = get_client_id_from_header('token', request.headers)
+        client = get_client_by_id(client_id, clients)
+        user = get_client_by_id(user_id, users)
+        if not client:
+            raise ClientNotFoundError(f"No client with ID {client_id}")
+        check_permission(client,"users","read")
+        return json.dumps(user.get_obj, ensure_ascii=False)
+    except AuthorizationError as e:
+        return jsonify({"status": "error", "message": str(e)}), 403
     except ValueError as e:
-        # Log the error
-        print(f"Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 400
-@app.route('/api/v1/organisations/<client_id>', methods=['GET'])
-def get_organisation(client_id):
+        
+@app.route('/api/v1/organisations/<int:org_id>', methods=['GET'])
+def get_organisation(org_id):
     try:
-        # Получение client_id из заголовка запроса
-        client_id = request.headers.get('client_id')
-        if not client_id:
-            raise ValueError("client_id not found in request header")
-        # Проверка, имеет ли пользователь разрешение на чтение организаций
-        user = get_current_user()  # Implement this function to get the current user
-        if not user.organisation.role['Organisations'].read:
-            raise ValueError("User does not have permission to read organisations")
-        # Поиск организации с данным client_id
-        organisation = Organisation.query.filter_by(client_id=client_id).first()
-        if not organisation:
-            raise ValueError(f"No organisation found with client_id = {client_id}")
-        # Проверка, есть ли у пользователя разрешение на доступ к организации
-        if not user.organisation.role['Organisations'].access:
-            raise ValueError("User does not have permission to access this organisation")
-        # Return the organisation data
-        return jsonify(organisation.to_dict())
+        client_id = get_client_id_from_header('token', request.headers)
+        client = get_client_by_id(client_id, clients)
+        org = get_client_by_id(org_id, organisations)
+        if not client:
+            raise ClientNotFoundError(f"No client with ID {client_id}")
+        check_permission(client,"organisations","read")
+        return json.dumps(org.get_obj, ensure_ascii=False)
+    except AuthorizationError as e:
+        return jsonify({"status": "error", "message": str(e)}), 403
     except ValueError as e:
-        # Log the error
-        print(f"Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 400
+
 @app.route('/api/v1/users', methods=['GET'])
 def get_users():
     try:
-        # Check if token header exists
-        if 'token' not in request.headers:
-            raise ValueError("Token header not found")
-        # Check if client has permission to view users
-        token = request.headers['users']
-        client_id = request.json['client_id']
-        user = next((u for u in users if u['client_id'] == client_id), None)
-        if not user:
-            raise ValueError("User not found")
-        if user['role'] != 'role':
-            raise ValueError("User does not have permission to view users")
-        # Return all users
-        return jsonify(users)
+        client_id = get_client_id_from_header('token', request.headers)
+        client = get_client_by_id(client_id, clients)
+        user_list = [ u.get_obj for u in users]
+        if not client:
+            raise ClientNotFoundError(f"No client with ID {client_id}")
+        check_permission(client,"users","read")
+        return json.dumps(user_list, ensure_ascii=False)
+    except AuthorizationError as e:
+        return jsonify({"status": "error", "message": str(e)}), 403
     except ValueError as e:
-        # Log the error
-        print(f"Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 400
+
 @app.route('/api/v1/organisations', methods=['GET'])
 def get_organisations():
     try:
-        # Check if the user has permission to read organisations
-        token = request.headers.get('Organisations')
-        if not token:
-            return jsonify({"status": "error", "message": "Token header not found"}), 400
-        token_data = json.loads(token)
-        client_id = token_data.get('client_id')
-        if not client_id:
-            return jsonify({"status": "error", "message": "Client ID not found in token header"}), 400
-        # Find the organisation with the given ID
-        organisation = next((org for org in organisations if org['client_id'] == client_id), None)
-        if not organisation:
-            return jsonify({"status": "error", "message": "Organisation not found"}), 404
-        # Check if the user has the permission to read organisations
-        if organisation['role'] != 'role':
-            return jsonify({"status": "error", "message": "User does not have permission to read organisations"}), 403
-        # Return data about all organisations
-        return jsonify(organisations)
-    except Exception as e:
-        # Log the error
-        print(f"Error: {e}")
-        return jsonify({"status": "error", "message": "Internal server error"}), 500
+        client_id = get_client_id_from_header('token', request.headers)
+        client = get_client_by_id(client_id, clients)
+        org_list = [o.get_obj for o in organisations]
+        if not client:
+            raise ClientNotFoundError(f"No client with ID {client_id}")
+        check_permission(client,"organisations","read")
+        return json.dumps(org_list, ensure_ascii=False)
+    except AuthorizationError as e:
+        return jsonify({"status": "error", "message": str(e)}), 403
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
 @app.route('/api/v1/users', methods=['PUT'])
 def create_user():
     try:
-        # Get the token header
-        token_header = request.headers.get('users')
-        # Check if the token header exists
-        if not token_header:
-            return jsonify({'status': 'error', 'message': 'Token header not found'}), 400
-        # Get the client ID from the token header
-        client_id = json.loads(token_header)['client_id']
-        # Check if the user has write access to the users resource
-        user = get_user_by_id(client_id)
-        if 'write' not in user['role']:
-            return jsonify({'status': 'error', 'message': 'User does not have write access to users resource'}), 403
-        # Get the user data from the request body
-        user_data = request.get_json()
-        # Write the user data to the JSON file
-        with open('users.json', 'w', encoding='utf-8') as f:
-            json.dump(user_data, f)
-        # Return a success message
+        client_id = get_client_id_from_header('token', request.headers)
+        client = get_client_by_id(client_id, clients)
+        if not client:
+            raise ClientNotFoundError(f"No client with ID {client_id}")
+
+        check_permission(client,"users","create")
+        data = request.get_json()
+        if not data or not all(key in data for key in ['role', 'first_name', 'fathers_name', 'date_of_birth', 'last_name']):
+            raise ValueError(f"Invalid organization data provided")
+        if data['role'] not in roles:
+            raise ValueError(f"Invalid role name provided")
+        data['client_id'] = next_client_id(clients)
+        data['role'] = roles[data['role']]
+        users.append(User(**data))
+        write_data(users, organisations)
+
         return jsonify({'status': 'success', 'message': 'User created successfully'}), 201
-    except Exception as e:
-        # Log the error
-        print(f"Error: {e}")
-        return jsonify({'status': 'error', 'message': 'An error occurred while creating the user'}), 500
+    except AuthorizationError as e:
+        return jsonify({"status": "error", "message": str(e)}), 403
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
 @app.route('/api/v1/organisations', methods=['PUT'])
 def create_organisation():
     try:
-        # Get the token from the header
-        token = request.headers.get('Organisations')
-        if not token:
-            return jsonify({"status": "error", "message": "Token header not found"}), 400
-        # Check if the user has permission to write to organizations
-        client_id = request.headers.get('client_id')
-        with open('users.json', 'r') as f:
-            users = json.load(f)
-        user = next((u for u in users if u['client_id'] == client_id), None)
-        if not user or 'write_organizations' not in user['role']:
-            return jsonify(
-                {"status": "error", "message": "User does not have permission to write to organizations"}), 403
-        # Get the organization data from the request body
+        client_id = get_client_id_from_header('token', request.headers)
+        client = get_client_by_id(client_id, clients)
+        if not client:
+            raise ClientNotFoundError(f"No client with ID {client_id}")
+
+        check_permission(client,"organisations","create")
         data = request.get_json()
         if not data or not all(key in data for key in ['role', 'creation_date', 'unp', 'name']):
-            return jsonify({"status": "error", "message": "Invalid organization data provided"}), 400
-        # Write the organization to the file
-        with open('users.json', 'w', encoding='utf-8') as f:
-            json.dump(data, f)
+            raise ValueError(f"Invalid organization data provided")
+        if data['role'] not in roles:
+            raise ValueError(f"Invalid role name provided")
+        data['role'] = roles[data['role']]
+        data['client_id'] = next_client_id(clients)
+        organisations.append(Organisation(**data))
+        write_data(users, organisations)
         return jsonify({"status": "success", "message": "Organization created successfully"}), 200
-    except Exception as e:
-        # Log the error
-        print(f"Error: {e}")
-        return jsonify({"status": "error", "message": "An error occurred while creating the organization"}), 500
-@app.route('/api/v1/credits/authz/<string:action>', methods=['GET'])
-@app.route('/api/v1/deposits/authz/<string:action>', methods=['GET'])
-@app.route('/api/v1/debitaccounts/authz/<string:action>', methods=['GET'])
-@app.route('/api/v1/creditaccounts/authz/<string:action>', methods=['GET'])
-@app.route('/api/v1/users/authz/<string:action>', methods=['GET'])
-@app.route('/api/v1/organisations/authz/<string:action>', methods=['GET'])
-@app.route('/api/v1/identities/authz/<string:action>', methods=['GET'])
-def check_authorization(action):
-    def check_authorization():
-        try:
-            # Get the requested URI
-            uri = request.path
-            # Get the token from the header
-            token = request.headers.get('token')
-            if not token:
-                return {"status": "error", "message": f"Token header not found"}, 400
-            # Find the role to check based on the URI
-            role = uri.split('/')[3]
-            action = uri.split('/')[-1]
-            authorized = getattr(user.role[role], action)
-            # Check if the client ID is present in the header
-            client_id = request.headers.get('client_id')
-            if not client_id:
-                return {"status": "error", "message": "Client ID not found in header"}, 400
-            # Find the object based on the client ID
-            obj = Object.query.filter_by(client_id=client_id).first()
-            if not obj:
-                return {"status": "error", "message": "Object not found"}, 404
-            # Check if the role has the required access
-            if not authorized:
-                return {"status": "error", "message": "Not authorized"}, 403
-            # Return success message
-            return {"status": "success", "message": "Authorized"}, 200
-        except Exception as e:
-            # Log the error
-            print(f"Error: {e}")
-            return {"status": "error", "message": "Something went wrong"}, 500
+    except AuthorizationError as e:
+        return jsonify({"status": "error", "message": str(e)}), 403
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+@app.route('/api/v1/<string:subject>/authz/<string:permission>', methods=['GET'])
+def check_authorization(subject, permission):
+    try:
+        client_id = get_client_id_from_header('token', request.headers)
+        client = get_client_by_id(client_id, clients)
+        if not client:
+            raise ClientNotFoundError(f"No client with ID {client_id}")
+
+        check_permission(client,subject,permission)
+        return {"status": "success", "message": "Authorized"}, 200
+    except AuthorizationError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host="0.0.0.0")
