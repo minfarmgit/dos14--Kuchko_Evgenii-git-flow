@@ -1,3 +1,7 @@
+- name: Create group
+  group:
+    name: authz
+  become: true
 - name: Create user
   user:
     name: authz
