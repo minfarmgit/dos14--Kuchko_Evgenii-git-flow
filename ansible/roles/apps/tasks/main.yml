@@ -48,7 +48,7 @@
   when: python_result.stat.exists == False
 - name: Install Python 3.11.0
   shell: make install chdir=/tmp/Python-3.11.0
-  become: yes
+  become: true
   become_user: root
   tags: packages, python
   when: python_result.stat.exists == False
