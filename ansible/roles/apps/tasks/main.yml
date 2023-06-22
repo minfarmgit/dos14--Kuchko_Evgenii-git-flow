@@ -23,13 +23,23 @@
   become: true
   apt: pkg={{ item }}
   with_items:
+    - build-essential
+    - zlib1g-dev
+    - libbz2-dev
+    - libsqlite3-dev
+    - curl
+    - libncursesw5-dev
+    - xz-utils
+    - tk-dev
+    - libxml2-dev
+    - libxmlsec1-dev
+    - libffi-dev
+    - liblzma-dev
     - wget
     - xz-utils
-    - build-essential
-    - libsqlite3-dev
     - libreadline-dev
     - libssl-dev
-    - openssl
+    - openssl    
   tags: packages, python
   when: python_result.stat.exists == False
 - name: Extract python 3.11 into /tmp
