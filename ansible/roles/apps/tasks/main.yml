@@ -48,6 +48,7 @@
     dest: /tmp/
     remote_src: yes
   tags: packages, python
+  when: python_result.stat.exists == False
 - name: Configure python 3.11.0
   shell: ./configure chdir=/tmp/Python-3.11.0
   tags: packages, python
