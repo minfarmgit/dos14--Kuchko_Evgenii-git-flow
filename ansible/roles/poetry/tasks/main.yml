@@ -3,10 +3,11 @@
   git:
     repo: https://github.com/GosuOoops/dos14--Kuchko_Evgenii-git-flow.git
     dest: /home/authz/git
-    version: master
+    version: "{{ git_branch }}"
     force: yes
 - name: Poetry install
   become: true
+  become_user: authz
   ansible.builtin.shell:
     chdir: /home/authz/git
     cmd: poetry install
