@@ -2,4 +2,5 @@
   roles:
     - createuser
     - apps
-    - poetry
+#    - poetry
+    - docker-compose
