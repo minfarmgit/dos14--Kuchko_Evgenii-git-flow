@@ -1,0 +1,11 @@
+version: "3.4"
+services:
+  docker:
+    image: homework25:latest
+    container_name: docker-compose
+    build: /home/authz/git
+    ports:
+      - 80:80
+    restart:
+      always
+
