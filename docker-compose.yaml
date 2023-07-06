@@ -3,11 +3,8 @@ services:
   docker:
     image: homework25:latest
     container_name: docker-compose
-    build:
-      context: .
-      dockerfile: Dockerfile
-    expose:
-      - 5000
+    ports:
+      - 5000:5000
     restart:
       always
 
