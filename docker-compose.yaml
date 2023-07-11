@@ -2,8 +2,20 @@ version: "3.4"
 services:
   docker:
     container_name: docker-compose
-    build: .
+    build: ./dockerfile
     ports:
-      - 80:5000
+      - "5000:5000"
     restart:
       always
+
+  nginx:
+    container_name: nginx
+    build: ./dockerfile-nginx
+    ports:
+      - "80:80"
+    restart:
+      always
+    depends_on:
+      - docker
+
+
