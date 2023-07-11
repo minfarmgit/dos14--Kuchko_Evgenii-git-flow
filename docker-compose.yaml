@@ -1,11 +1,20 @@
 version: "3.4"
 services:
   docker:
-    image: homework25:latest
     container_name: docker-compose
-    build: /home/authz/git
+    build: ./dockerfile
     ports:
-      - 80:80
+      - "5000:5000"
     restart:
       always
+
+  nginx:
+    container_name: nginx
+    build: ./dockerfile-nginx
+    ports:
+      - "80:80"
+    restart:
+      always
+    depends_on:
+      - docker
 
