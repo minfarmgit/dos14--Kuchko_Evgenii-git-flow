@@ -11,11 +11,11 @@ services:
   nginx:
     container_name: nginx
     build: ./dockerfile-nginx
+     volumes:
+      - /home/authz:/app2:rw
     ports:
       - "80:80"
     restart:
       always
     depends_on:
       - docker
-
-
