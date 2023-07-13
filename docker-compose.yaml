@@ -12,7 +12,7 @@ services:
     container_name: nginx
     build: ./dockerfile-nginx
      volumes:
-      - /home/authz:/app2:rw
+      - ./somevol:/app2:rw
     ports:
       - "80:80"
     restart:
