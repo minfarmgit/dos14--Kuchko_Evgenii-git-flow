@@ -11,7 +11,7 @@ services:
   nginx:
     container_name: nginx
     build: ./dockerfile-nginx
-     volumes:
+    volumes:
       - ./somevol:/app2:rw
       - ./logs:/var/log/nginx
     ports:
