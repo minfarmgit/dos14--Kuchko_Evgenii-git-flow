@@ -9,6 +9,7 @@ services:
       always
 
   nginx:
+    image: nginx:latest
     container_name: nginx
     build: ./dockerfile-nginx
     volumes:
