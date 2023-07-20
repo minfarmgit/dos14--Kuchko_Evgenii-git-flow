@@ -1,7 +1,7 @@
 version: "3.4"
 services:
   docker:
-    container_name: docker-compose
+    container_name: flask-app
     build: ./dockerfile
     ports:
       - "5000:5000"
@@ -10,14 +10,11 @@ services:
 
   nginx:
     image: nginx:latest
-    container_name: nginx
-    build: ./dockerfile-nginx
+    container_name: proxy-nginx
     volumes:
-      - ./somevol:/app2:rw
+      - ./nginx:/etc/nginx/conf.d
       - ./logs:/var/log/nginx
     ports:
       - "80:80"
     restart:
       always
-    depends_on:
-      - docker
